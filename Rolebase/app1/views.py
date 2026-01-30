@@ -45,10 +45,19 @@ class StaffViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'])
     def create_staff(self, request):
         serializer = StaffSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response(UserSeriliazer(user).data)
-        return Response(serializer.errors, status=400)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UserSeriliazer(user).data, status=201)
+    
+    @action(detail=False, methods=['get'])
+    def get_staff_permission(self,request):
+        group=Group.objects.filter(name="staff")
+        if not group:
+            return Response({"detail":"No permission found"})
+        serializers=GroupSeriliazer(group[0])
+        return Response(serializers.data)
+        
+    
 
 
 class PatientViewSet(viewsets.ViewSet):

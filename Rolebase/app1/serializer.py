@@ -68,7 +68,7 @@ class UserSeriliazer(serializers.ModelSerializer):
                     }
                 elif hasattr(staff, "accountant"):
                     staff_data["accountant"] = {
-                        "certification": staff.accountant.certification,
+                        "certification": staff.accountant.accounting_certification,
                         "years_of_experience": staff.accountant.years_of_experience
                     }
 
@@ -103,6 +103,7 @@ class StaffSerializer(serializers.Serializer):
     shift =serializers.ChoiceField(choices=NurseProfile.Nurse_choices,required=False)
     certification=serializers.CharField(required=False)
     lab_type=serializers.CharField(required=False,allow_blank=False)
+    permission=serializers.PrimaryKeyRelatedField(queryset=Permission.objects.all(),many=True)
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
@@ -110,8 +111,13 @@ class StaffSerializer(serializers.Serializer):
                 "This username is already taken. Please choose another one."
             )
         return value
-
-
+    
+    def validate_employee_id(self, value):
+        if staffProfile.objects.filter(employee_id=value).exists():
+            raise serializers.ValidationError(
+                "This employee_id is already taken."
+            )
+        return value
 
     def validate(self, data):
         staff_type = data.get('staff_type')
@@ -122,31 +128,34 @@ class StaffSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {f: f"{f} is required for doctors" for f in missing}
                 )
-        if staff_type == "nurse":
+        elif staff_type == "nurse":
             nurse_fields = ["ward", "license_number","shift"]
             missing = [f for f in nurse_fields if not data.get(f)]
             if missing:
                 raise serializers.ValidationError(
-                    {f: f"{f} is required for doctors" for f in missing}
+                    {f: f"{f} is required for nurse" for f in missing}
                 )
-        if staff_type == "lab":
+        elif staff_type == "lab":
             lab_fields = ["certification", "lab_type "]
             missing = [f for f in lab_fields if not data.get(f)]
             if missing:
                 raise serializers.ValidationError(
-                    {f: f"{f} is required for doctors" for f in missing}
+                    {f: f"{f} is required for lab" for f in missing}
                 )
         return data
     
 
     @transaction.atomic
     def create(self, data):
+        permission=data.pop("permission")
         staff_type = data["staff_type"]
         user = User.objects.create_user(
             username=data["username"],
             password=data["password"],
             role="staff"
         )
+        if permission:
+            user.user_permissions.set(permission)
         staff = staffProfile.objects.create(
             user=user,
             employee_id=data["employee_id"],
